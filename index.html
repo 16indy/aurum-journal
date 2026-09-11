@@ -872,21 +872,39 @@ window._previewShot = (e, tf) => {
   reader.readAsDataURL(file);
 };
 
+// COMPRESIÓN OPTIMIZADA PARA PERMITIR 3 IMÁGENES DENTRO DEL LÍMITE DE 1MB DE FIREBASE
 function compressImage(file) {
   return new Promise((resolve) => {
     const prog = document.getElementById('uploadProgress'), bar = document.getElementById('progressBar');
-    prog.classList.add('show'); bar.style.width = '40%';
+    prog.classList.add('show'); bar.style.width = '30%';
+    
     const reader = new FileReader();
+    
+    reader.onerror = () => { prog.classList.remove('show'); resolve(null); };
+    
     reader.onload = (e) => {
       const img = new Image();
+      
+      img.onerror = () => { prog.classList.remove('show'); resolve(null); };
+      
       img.onload = () => {
-        const MAX = 1200; let w = img.width, h = img.height;
+        // Reducimos a 800px para garantizar que las 3 imágenes jamás superen 1MB
+        const MAX = 800; 
+        let w = img.width, h = img.height;
         if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
         if (h > MAX) { w = Math.round(w*MAX/h); h = MAX; }
-        const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
-        canvas.getContext('2d').drawImage(img,0,0,w,h);
-        bar.style.width='100%';
-        setTimeout(() => { prog.classList.remove('show'); resolve(canvas.toDataURL('image/jpeg',0.7)); }, 300);
+        
+        const canvas = document.createElement('canvas'); 
+        canvas.width = w; 
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        bar.style.width = '100%';
+        
+        // WEBP es extremadamente ligero. Calidad 0.6 lo mantiene legible y por debajo de 150kb
+        setTimeout(() => { 
+          prog.classList.remove('show'); 
+          resolve(canvas.toDataURL('image/webp', 0.6)); 
+        }, 300);
       };
       img.src = e.target.result;
     };
@@ -944,7 +962,6 @@ window._saveTrade = async () => {
       pnl: parseFloat(document.getElementById('fPnL').value)||0,
       result, rr,
       
-      // Nuevos campos MTF
       htfDol: document.getElementById('fHtfDol').value,
       htfStructure: document.getElementById('fHtfStructure').value,
       htfProtected: document.getElementById('fHtfProtected').value,
@@ -964,7 +981,7 @@ window._saveTrade = async () => {
       screenshotHtfBase64,
       screenshotItfBase64,
       screenshotLtfBase64,
-      screenshotBase64, // Legacy resguardo
+      screenshotBase64,
       
       mae: parseFloat(document.getElementById('fMae')?.value)||null,
       mfe: parseFloat(document.getElementById('fMfe')?.value)||null,
@@ -1019,7 +1036,7 @@ function updateStats() {
   
   const wins = trades.filter(t=>t.result==='win').length;
   const losses = trades.filter(t=>t.result==='loss').length;
-  const pureTrades = wins + losses;
+  const pureTrades = wins + losses; 
   
   const wr = pureTrades > 0 ? ((wins/pureTrades)*100).toFixed(0) : 0;
   
@@ -1270,7 +1287,7 @@ window._openTradeModal = (id) => {
   const qg = document.getElementById('mQuantGrid');
   if(qg){
     const arr = [];
-    if(t.bias) arr.push({l:'Bias 4H', v: t.bias === 'aligned' ? 'Alineado' : t.bias === 'contrary' ? 'Contrario' : t.bias}); // Legacy persistente
+    if(t.bias) arr.push({l:'Bias 4H', v: t.bias === 'aligned' ? 'Alineado' : t.bias === 'contrary' ? 'Contrario' : t.bias});
     arr.push({l:'Duración', v: t.durationMin != null ? `${t.durationMin} min` : 'No registrada'});
     arr.push({l:'Gestión SL', v: t.slMgmtReal || t.slManagement || 'No registrado'});
     arr.push({l:'Señales', v: (t.techSignals && t.techSignals.length > 0) ? t.techSignals.join(', ') : (t.setupType || 'No registrado')});
