@@ -630,12 +630,6 @@
     </div>
     <div class="modal-body">
       
-      <!-- CONTENEDOR DINAMICO DE IMÁGENES -->
-      <div id="mImagesGrid" style="display:none; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0;">
-        <div><div style="font-family:'Space Mono'; font-size:10px; color:var(--gold2); margin-bottom:6px;">HTF</div><img id="mShotHtf" class="modal-screenshot" style="margin:0; width:100%; cursor:zoom-in;" onclick="openLightbox(this.src)"></div>
-        <div><div style="font-family:'Space Mono'; font-size:10px; color:var(--gold2); margin-bottom:6px;">ITF</div><img id="mShotItf" class="modal-screenshot" style="margin:0; width:100%; cursor:zoom-in;" onclick="openLightbox(this.src)"></div>
-        <div><div style="font-family:'Space Mono'; font-size:10px; color:var(--gold2); margin-bottom:6px;">LTF</div><img id="mShotLtf" class="modal-screenshot" style="margin:0; width:100%; cursor:zoom-in;" onclick="openLightbox(this.src)"></div>
-      </div>
       <img class="modal-screenshot" id="mScreenshot" style="display:none" onclick="openLightbox(this.src)"> <!-- Fallback viejo -->
 
       <div class="detail-grid">
@@ -649,7 +643,7 @@
 
       <div style="margin-bottom:12px">
         <div id="mQuantGrid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px"></div>
-        <div id="mTfAnalysis" style="margin-bottom:16px;"></div> <!-- NUEVO: Muestra la info de HTF/ITF/LTF -->
+        <div id="mTfAnalysis" style="margin-bottom:16px;"></div> <!-- Muestra la info de HTF/ITF/LTF Integrada -->
         <div class="trade-notes-display" id="mNotes" style="font-size:12px;line-height:1.8;">Sin notas.</div>
       </div>
       
@@ -888,7 +882,6 @@ function compressImage(file) {
       img.onerror = () => { prog.classList.remove('show'); resolve(null); };
       
       img.onload = () => {
-        // Reducimos a 800px para garantizar que las 3 imágenes jamás superen 1MB
         const MAX = 800; 
         let w = img.width, h = img.height;
         if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
@@ -900,7 +893,6 @@ function compressImage(file) {
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         bar.style.width = '100%';
         
-        // WEBP es extremadamente ligero. Calidad 0.6 lo mantiene legible y por debajo de 150kb
         setTimeout(() => { 
           prog.classList.remove('show'); 
           resolve(canvas.toDataURL('image/webp', 0.6)); 
@@ -1260,30 +1252,16 @@ window._openTradeModal = (id) => {
   document.getElementById('mTP').textContent=t.tp||'—';
   document.getElementById('mLots').textContent=t.lots||'—';
   document.getElementById('mRR').textContent=t.rr ? '1:'+t.rr : '—';
-  
-  // RENDER DE IMÁGENES
-  const mGrid = document.getElementById('mImagesGrid');
-  const sHtf = document.getElementById('mShotHtf');
-  const sItf = document.getElementById('mShotItf');
-  const sLtf = document.getElementById('mShotLtf');
-  const oldShot = document.getElementById('mScreenshot');
 
-  if(t.screenshotHtfBase64 || t.screenshotItfBase64 || t.screenshotLtfBase64) {
-      mGrid.style.display = 'grid';
-      oldShot.style.display = 'none';
-      if(t.screenshotHtfBase64){ sHtf.src = t.screenshotHtfBase64; sHtf.parentElement.style.display='block'; } else sHtf.parentElement.style.display='none';
-      if(t.screenshotItfBase64){ sItf.src = t.screenshotItfBase64; sItf.parentElement.style.display='block'; } else sItf.parentElement.style.display='none';
-      if(t.screenshotLtfBase64){ sLtf.src = t.screenshotLtfBase64; sLtf.parentElement.style.display='block'; } else sLtf.parentElement.style.display='none';
-  } else if(t.screenshotBase64) {
-      mGrid.style.display = 'none';
+  // LEGACY SCREENSHOT FALLBACK
+  const oldShot = document.getElementById('mScreenshot');
+  if(t.screenshotBase64 && !t.screenshotHtfBase64 && !t.screenshotItfBase64 && !t.screenshotLtfBase64) {
       oldShot.src = t.screenshotBase64;
       oldShot.style.display = 'block';
   } else {
-      mGrid.style.display = 'none';
       oldShot.style.display = 'none';
   }
-
-  // RENDER DE DATOS PRINCIPALES
+  
   const qg = document.getElementById('mQuantGrid');
   if(qg){
     const arr = [];
@@ -1295,35 +1273,52 @@ window._openTradeModal = (id) => {
     qg.innerHTML= arr.map(x=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px"><div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px">${x.l}</div><div style="font-family:'Space Mono',monospace;font-size:12px;font-weight:700;color:var(--gold2)">${x.v}</div></div>`).join('');
   }
 
-  // RENDER MULTI-TIMEFRAME ANALYSIS
+  // RENDER MULTI-TIMEFRAME ANALYSIS CON IMÁGENES INTEGRADAS
   let tfHtml = '';
-  if (t.htfDol || t.itfDol || t.ltfDol) {
+  const hasMtf = t.htfDol || t.itfDol || t.ltfDol || t.screenshotHtfBase64 || t.screenshotItfBase64 || t.screenshotLtfBase64;
+  
+  if (hasMtf) {
       tfHtml += `<div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold2);letter-spacing:0.1em;text-transform:uppercase;margin:18px 0 10px;">MULTI-TIMEFRAME ANALYSIS</div>
       <div class="tf-grid" style="margin-bottom:16px;">`;
       
-      tfHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
-          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);margin-bottom:8px;">HTF</div>
+      // HTF CARD
+      tfHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px; display:flex; flex-direction:column; gap:10px;">
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);">HTF (1D / 4H)</div>`;
+      if (t.screenshotHtfBase64) {
+          tfHtml += `<img src="${t.screenshotHtfBase64}" class="modal-screenshot" style="width:100%; border-radius:4px; cursor:zoom-in; margin:0;" onclick="openLightbox(this.src)">`;
+      }
+      tfHtml += `<div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">DOL:</span> ${t.htfDol||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Struct:</span> ${t.htfStructure||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Prot L/H:</span> ${t.htfProtected||'—'}</div>
-      </div>`;
+      </div></div>`;
 
-      tfHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
-          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);margin-bottom:8px;">ITF</div>
+      // ITF CARD
+      tfHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px; display:flex; flex-direction:column; gap:10px;">
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);">ITF (15M / 5M)</div>`;
+      if (t.screenshotItfBase64) {
+          tfHtml += `<img src="${t.screenshotItfBase64}" class="modal-screenshot" style="width:100%; border-radius:4px; cursor:zoom-in; margin:0;" onclick="openLightbox(this.src)">`;
+      }
+      tfHtml += `<div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">DOL:</span> ${t.itfDol||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Struct:</span> ${t.itfStructure||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Prot L/H:</span> ${t.itfProtected||'—'}</div>
-      </div>`;
+      </div></div>`;
 
-      tfHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
-          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);margin-bottom:8px;">LTF</div>
+      // LTF CARD
+      tfHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px; display:flex; flex-direction:column; gap:10px;">
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--gold);">LTF (1M)</div>`;
+      if (t.screenshotLtfBase64) {
+          tfHtml += `<img src="${t.screenshotLtfBase64}" class="modal-screenshot" style="width:100%; border-radius:4px; cursor:zoom-in; margin:0;" onclick="openLightbox(this.src)">`;
+      }
+      tfHtml += `<div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">DOL:</span> ${t.ltfDol||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Deliv:</span> ${t.ltfDelivery||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Prot H/L:</span> ${t.ltfProtected||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Vol:</span> ${t.ltfVolume||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">Struct:</span> ${t.ltfStructure||'—'}</div>
           <div style="font-size:12px;color:var(--text);line-height:1.6"><span style="color:var(--text3)">LR:</span> ${t.ltfLr||'—'}</div>
-      </div>`;
+      </div></div>`;
 
       tfHtml += `</div>`;
   }
@@ -1333,13 +1328,11 @@ window._openTradeModal = (id) => {
   pe.textContent=(t.pnl>=0?'+':'')+'$'+(t.pnl||0).toFixed(2);
   pe.className='dvalue '+(t.pnl>0?'green':t.pnl<0?'red':'');
   
-  // DICCIONARIO CUALITATIVO
   const qDict = {
     fQ2: 'Were my entry, stop, and target well-placed based on structure and liquidity?',
     fQ3: 'Did I follow my trading plan and rules? If not, why?',
     fQ4: 'What were my emotions before, during, and after the trade and did I rush?',
     fQ9: 'What\'s one thing I learned or want to do better in the next session?',
-    // Resguardo Histórico:
     fQ1: 'Why did I take long or short?',
     fQ5: 'What levels did price respect and was it the levels I had marked out?',
     fQ6: 'What confluences did I enter off of?',
